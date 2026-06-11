@@ -20,7 +20,12 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/landing.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/80 z-[-1]" />
       {/* Navigation */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">

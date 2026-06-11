@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Shield, Check } from "lucide-react"
+import { Shield, Check, ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { ReportUploadStep } from "@/components/onboarding/report-upload-step"
 import { HealthSurveyStep } from "@/components/onboarding/health-survey-step"
 import { ReviewStep } from "@/components/onboarding/review-step"
@@ -18,13 +19,14 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [hasExistingPlan, setHasExistingPlan] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push("/auth/login")
         return
@@ -32,23 +34,35 @@ export default function OnboardingPage() {
 
       setUserId(user.id)
 
-      // Get current onboarding step
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_step, role")
-        .eq("id", user.id)
-        .single()
+      // Get profile + check for existing diet plan in parallel
+      const [profileRes, planRes] = await Promise.all([
+        supabase.from("profiles").select("onboarding_step, role").eq("id", user.id).single(),
+        supabase.from("diet_plans").select("id").eq("user_id", user.id).eq("is_active", true).maybeSingle(),
+      ])
+
+      const profile = profileRes.data
+      const existingPlan = planRes.data
+
+      // If they have an existing diet plan they can go back to dashboard
+      setHasExistingPlan(!!existingPlan)
 
       if (profile) {
         if (profile.role === "GUIDE") {
           router.push("/guide/dashboard")
           return
         }
-        if (profile.onboarding_step >= 3) {
+        // Only auto-redirect if completed AND no retake intent (no active plan means first time)
+        if (profile.onboarding_step >= 3 && !existingPlan) {
           router.push("/dashboard")
           return
         }
-        setCurrentStep(profile.onboarding_step + 1)
+        // If fully completed and has a plan they are retaking — start at Medical Report
+        if (profile.onboarding_step >= 3 && existingPlan) {
+          setCurrentStep(1) // Always start at Medical Report when retaking
+          setIsLoading(false)
+          return
+        }
+        setCurrentStep(Math.max(1, profile.onboarding_step + 1))
       }
 
       setIsLoading(false)
@@ -60,7 +74,6 @@ export default function OnboardingPage() {
   const handleStepComplete = async (step: number) => {
     if (!userId) return
 
-    // Update onboarding step in profile
     await supabase
       .from("profiles")
       .update({ onboarding_step: step, updated_at: new Date().toISOString() })
@@ -71,6 +84,12 @@ export default function OnboardingPage() {
     } else {
       setCurrentStep(step + 1)
     }
+  }
+
+  const handleBackToDashboard = async () => {
+    if (!userId) return
+    await supabase.from("profiles").update({ onboarding_step: 3 }).eq("id", userId)
+    router.push("/dashboard")
   }
 
   if (isLoading) {
@@ -87,7 +106,27 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 py-8">
+    <div className="min-h-screen py-8 relative overflow-hidden">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/landing.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/80 z-[-1]" />
+      {/* Always-visible back button when user has an existing diet plan */}
+      {hasExistingPlan && (
+        <div className="fixed top-4 left-4 z-50">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBackToDashboard}
+            className="flex items-center gap-2 bg-background shadow-md border"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
+      )}
+
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -97,8 +136,14 @@ export default function OnboardingPage() {
             </div>
             <span className="text-2xl font-bold text-foreground">NutriGuard AI</span>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Welcome! Let&apos;s Set Up Your Profile</h1>
-          <p className="text-muted-foreground">Complete these steps to get your personalized diet plan</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {hasExistingPlan ? "Update Your Health Profile" : "Welcome! Let's Set Up Your Profile"}
+          </h1>
+          <p className="text-muted-foreground">
+            {hasExistingPlan
+              ? "Make changes below. You can go back to keep your current plan unchanged."
+              : "Complete these steps to get your personalized diet plan"}
+          </p>
         </div>
 
         {/* Progress Steps */}
@@ -155,10 +200,18 @@ export default function OnboardingPage() {
             <ReportUploadStep userId={userId} onComplete={() => handleStepComplete(1)} />
           )}
           {currentStep === 2 && userId && (
-            <HealthSurveyStep userId={userId} onComplete={() => handleStepComplete(2)} />
+            <HealthSurveyStep
+              userId={userId}
+              onComplete={() => handleStepComplete(2)}
+              onBack={() => setCurrentStep(1)}
+            />
           )}
           {currentStep === 3 && userId && (
-            <ReviewStep userId={userId} onComplete={() => handleStepComplete(3)} />
+            <ReviewStep
+              userId={userId}
+              onComplete={() => handleStepComplete(3)}
+              onBack={() => setCurrentStep(2)}
+            />
           )}
         </div>
       </div>

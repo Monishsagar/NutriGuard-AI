@@ -30,12 +30,15 @@ interface MealLog {
   logged_at: string
   photo_url: string | null
   detected_foods: Array<{
-    name: string
-    portion: string
-    calories: number
-    protein: number
-    carbs: number
-    fat: number
+    label: string
+    portionGrams: number
+    kcal: number
+    macros: {
+      protein: number
+      carbs: number
+      fat: number
+      fiber?: number
+    }
   }>
   total_nutrition: {
     calories: number
@@ -136,7 +139,7 @@ export default function MealsPage() {
   }, [fetchMeals, fetchDietPlan])
 
   const getMealForSlot = (slotId: string) => {
-    return mealLogs.find(meal => meal.meal_slot === slotId)
+    return mealLogs.find(meal => meal.meal_slot.toLowerCase() === slotId.toLowerCase())
   }
 
   const getTotalNutrition = () => {
@@ -152,7 +155,17 @@ export default function MealsPage() {
   }
 
   const handleLogMeal = (slotId: string) => {
-    setSelectedSlot(slotId)
+    setSelectedSlot(slotId.toUpperCase())
+    setIsDialogOpen(true)
+  }
+
+  const handleRelog = async (meal: MealLog) => {
+    const supabase = createClient()
+    // Delete the existing meal log so the slot becomes available again
+    await supabase.from("meal_logs").delete().eq("id", meal.id)
+    // Refresh meals list then open dialog for the same slot
+    await fetchMeals()
+    setSelectedSlot(meal.meal_slot.toUpperCase())
     setIsDialogOpen(true)
   }
 
@@ -167,12 +180,17 @@ export default function MealsPage() {
 
   const getDeviationCount = () => {
     return mealLogs.filter(m => 
-      m.deviation_class === "HIGH" || m.deviation_class === "CRITICAL"
+      m.deviation_class === "MAJOR"
     ).length
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative overflow-hidden min-h-[calc(100vh-5rem)]">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/log-meal.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/80 z-[-1]" />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Meal Tracking</h1>
@@ -340,7 +358,7 @@ export default function MealsPage() {
                 const Icon = slot.icon
 
                 return meal ? (
-                  <MealCard key={slot.id} meal={meal} slot={slot} />
+                  <MealCard key={slot.id} meal={meal} slot={slot} onRelog={() => handleRelog(meal)} />
                 ) : (
                   <Card 
                     key={slot.id} 
@@ -369,13 +387,13 @@ export default function MealsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {mealLogs.length > 0 ? (
               mealLogs.map(meal => {
-                const slot = MEAL_SLOTS.find(s => s.id === meal.meal_slot) || {
+                const slot = MEAL_SLOTS.find(s => s.id.toLowerCase() === meal.meal_slot.toLowerCase()) || {
                   id: meal.meal_slot,
-                  label: meal.meal_slot,
+                  label: meal.meal_slot.charAt(0) + meal.meal_slot.slice(1).toLowerCase(),
                   icon: Utensils,
                   time: ""
                 }
-                return <MealCard key={meal.id} meal={meal} slot={slot} />
+                return <MealCard key={meal.id} meal={meal} slot={slot} onRelog={() => handleRelog(meal)} />
               })
             ) : (
               <Card className="col-span-2">

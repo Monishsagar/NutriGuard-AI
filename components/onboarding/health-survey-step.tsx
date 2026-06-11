@@ -26,6 +26,7 @@ import {
 interface HealthSurveyStepProps {
   userId: string
   onComplete: () => void
+  onBack: () => void
 }
 
 const COMMON_ALLERGIES = [
@@ -68,12 +69,14 @@ const HEALTH_GOALS = [
   { value: "GENERAL_WELLNESS", label: "General Wellness", description: "Maintain overall health" },
 ]
 
-export function HealthSurveyStep({ userId, onComplete }: HealthSurveyStepProps) {
+export function HealthSurveyStep({ userId, onComplete, onBack }: HealthSurveyStepProps) {
   const [allergies, setAllergies] = useState<string[]>([])
   const [activityLevel, setActivityLevel] = useState("")
   const [dietPreference, setDietPreference] = useState("")
   const [mealFrequency, setMealFrequency] = useState("")
   const [healthGoal, setHealthGoal] = useState("")
+  const [height, setHeight] = useState("")
+  const [weight, setWeight] = useState("")
   const [waterGoal, setWaterGoal] = useState("2.5")
   const [medications, setMedications] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -90,7 +93,7 @@ export function HealthSurveyStep({ userId, onComplete }: HealthSurveyStepProps) 
   }
 
   const handleSubmit = async () => {
-    if (!activityLevel || !dietPreference || !mealFrequency || !healthGoal) {
+    if (!activityLevel || !dietPreference || !mealFrequency || !healthGoal || !height || !weight) {
       setError("Please fill in all required fields")
       return
     }
@@ -106,6 +109,8 @@ export function HealthSurveyStep({ userId, onComplete }: HealthSurveyStepProps) 
         diet_preference: dietPreference,
         meal_frequency: mealFrequency,
         health_goal: healthGoal,
+        height: parseFloat(height),
+        weight: parseFloat(weight),
         water_goal: parseFloat(waterGoal),
         medications: medications || null,
         completed_at: new Date().toISOString(),
@@ -143,6 +148,34 @@ export function HealthSurveyStep({ userId, onComplete }: HealthSurveyStepProps) 
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* Basics: Height & Weight */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              <Label className="text-base font-medium">Height (cm) *</Label>
+            </div>
+            <Input
+              type="number"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              placeholder="e.g. 170"
+            />
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              <Label className="text-base font-medium">Weight (kg) *</Label>
+            </div>
+            <Input
+              type="number"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              placeholder="e.g. 70"
+            />
+          </div>
+        </div>
 
         {/* Activity Level */}
         <div className="space-y-4">
@@ -311,7 +344,10 @@ export function HealthSurveyStep({ userId, onComplete }: HealthSurveyStepProps) 
         </div>
       </CardContent>
 
-      <CardFooter className="flex justify-end">
+      <CardFooter className="flex justify-between">
+        <Button variant="outline" onClick={onBack} disabled={isLoading}>
+          Back
+        </Button>
         <Button onClick={handleSubmit} disabled={isLoading}>
           {isLoading ? (
             <>

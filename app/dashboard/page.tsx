@@ -20,12 +20,18 @@ import {
   Loader2
 } from "lucide-react"
 
+interface DietDay {
+  day: number
+  dayName: string
+  breakfast: { name: string; totalCalories: number }
+  lunch: { name: string; totalCalories: number }
+  dinner: { name: string; totalCalories: number }
+  snacks: Array<{ name: string; calories: number }>
+}
+
 interface DietPlan {
   plan_json: {
-    breakfast: { name: string; totalCalories: number }
-    lunch: { name: string; totalCalories: number }
-    dinner: { name: string; totalCalories: number }
-    snacks: Array<{ name: string; calories: number }>
+    days: DietDay[]
     dailySummary: {
       totalCalories: number
       protein: number
@@ -116,6 +122,13 @@ export default function DashboardPage() {
     )
   }
 
+  // Find today's diet day from the plan
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  const todayDayName = DAY_NAMES[new Date().getDay()]
+  const todayDietDay = dietPlan?.plan_json?.days?.find(
+    (d: DietDay) => d.dayName?.toLowerCase() === todayDayName.toLowerCase()
+  ) ?? dietPlan?.plan_json?.days?.[0]
+
   // Calculate today's progress
   const consumedCalories = todayMeals.reduce(
     (sum, meal) => sum + (meal.total_nutrition?.calories || 0), 
@@ -149,18 +162,23 @@ export default function DashboardPage() {
   const mealSlots = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 relative overflow-hidden min-h-[calc(100vh-5rem)] pb-8">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/dashboard.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/80 z-[-1]" />
       {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card className="bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Calories Today
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
+              Calories
             </CardTitle>
-            <Flame className="h-4 w-4 text-primary" />
+            <Flame className="h-4 w-4 text-primary flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {consumedCalories}
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}/ {targetCalories} kcal
@@ -171,14 +189,14 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Protein
             </CardTitle>
-            <Target className="h-4 w-4 text-chart-1" />
+            <Target className="h-4 w-4 text-chart-1 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {consumedProtein}g
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}/ {targetProtein}g
@@ -189,14 +207,14 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Carbs
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-chart-2" />
+            <TrendingUp className="h-4 w-4 text-chart-2 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {consumedCarbs}g
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}/ {targetCarbs}g
@@ -207,14 +225,14 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Fat
             </CardTitle>
-            <Droplets className="h-4 w-4 text-chart-3" />
+            <Droplets className="h-4 w-4 text-chart-3 flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {consumedFat}g
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}/ {targetFat}g
@@ -225,7 +243,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Today's Meal Status */}
         <Card className="bg-card">
           <CardHeader>
@@ -236,14 +254,13 @@ export default function DashboardPage() {
             {mealSlots.map((slot) => {
               const isLogged = loggedMealSlots.includes(slot)
               const meal = todayMeals.find(m => m.meal_slot === slot)
-              const mealName = dietPlan?.plan_json?.[slot.toLowerCase() as keyof typeof dietPlan.plan_json]
               
               return (
                 <div
                   key={slot}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                  className="flex items-center justify-between p-2 sm:p-3 rounded-lg border bg-muted/30"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     {isLogged ? (
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
                         <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -293,8 +310,10 @@ export default function DashboardPage() {
         <Card className="bg-card">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-foreground">Your Diet Plan</CardTitle>
-              <CardDescription className="text-muted-foreground">AI-generated personalized meals</CardDescription>
+              <CardTitle className="text-foreground">Today&apos;s Diet Plan</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                {todayDietDay ? todayDietDay.dayName : "AI-generated personalized meals"}
+              </CardDescription>
             </div>
             <Link href="/dashboard/diet-plan">
               <Button variant="outline" size="sm">
@@ -304,39 +323,39 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {dietPlan?.plan_json ? (
+            {todayDietDay ? (
               <>
                 <div className="p-3 rounded-lg border bg-muted/30">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Breakfast</span>
                     <span className="text-sm text-muted-foreground">
-                      {dietPlan.plan_json.breakfast?.totalCalories || 0} kcal
+                      {todayDietDay.breakfast?.totalCalories || 0} kcal
                     </span>
                   </div>
                   <p className="mt-1 font-medium text-foreground">
-                    {dietPlan.plan_json.breakfast?.name || "Not set"}
+                    {todayDietDay.breakfast?.name || "Not set"}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg border bg-muted/30">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Lunch</span>
                     <span className="text-sm text-muted-foreground">
-                      {dietPlan.plan_json.lunch?.totalCalories || 0} kcal
+                      {todayDietDay.lunch?.totalCalories || 0} kcal
                     </span>
                   </div>
                   <p className="mt-1 font-medium text-foreground">
-                    {dietPlan.plan_json.lunch?.name || "Not set"}
+                    {todayDietDay.lunch?.name || "Not set"}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg border bg-muted/30">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">Dinner</span>
                     <span className="text-sm text-muted-foreground">
-                      {dietPlan.plan_json.dinner?.totalCalories || 0} kcal
+                      {todayDietDay.dinner?.totalCalories || 0} kcal
                     </span>
                   </div>
                   <p className="mt-1 font-medium text-foreground">
-                    {dietPlan.plan_json.dinner?.name || "Not set"}
+                    {todayDietDay.dinner?.name || "Not set"}
                   </p>
                 </div>
               </>
@@ -359,23 +378,23 @@ export default function DashboardPage() {
           <CardTitle className="text-foreground">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Link href="/dashboard/log-meal">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <Camera className="h-6 w-6 text-primary" />
-                <span>Log a Meal</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Link href="/dashboard/log-meal" className="col-span-2 sm:col-span-1">
+              <Button variant="outline" className="w-full h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-2">
+                <Camera className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <span className="text-sm">Log a Meal</span>
               </Button>
             </Link>
             <Link href="/dashboard/diet-plan">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <Utensils className="h-6 w-6 text-primary" />
-                <span>View Diet Plan</span>
+              <Button variant="outline" className="w-full h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-2">
+                <Utensils className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <span className="text-sm">Diet Plan</span>
               </Button>
             </Link>
             <Link href="/dashboard/progress">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <TrendingUp className="h-6 w-6 text-primary" />
-                <span>View Progress</span>
+              <Button variant="outline" className="w-full h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-2">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <span className="text-sm">Progress</span>
               </Button>
             </Link>
           </div>

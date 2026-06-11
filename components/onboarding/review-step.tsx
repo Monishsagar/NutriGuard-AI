@@ -20,6 +20,7 @@ import {
 interface ReviewStepProps {
   userId: string
   onComplete: () => void
+  onBack: () => void
 }
 
 interface MedicalProfile {
@@ -34,6 +35,8 @@ interface HealthSurvey {
   allergies: string[]
   water_goal: number
   medications: string | null
+  height?: number
+  weight?: number
 }
 
 const LABELS: Record<string, string> = {
@@ -55,7 +58,7 @@ const LABELS: Record<string, string> = {
   GENERAL_WELLNESS: "General Wellness",
 }
 
-export function ReviewStep({ userId, onComplete }: ReviewStepProps) {
+export function ReviewStep({ userId, onComplete, onBack }: ReviewStepProps) {
   const [medicalProfile, setMedicalProfile] = useState<MedicalProfile | null>(null)
   const [healthSurvey, setHealthSurvey] = useState<HealthSurvey | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -72,12 +75,16 @@ export function ReviewStep({ userId, onComplete }: ReviewStepProps) {
             .from("medical_profiles")
             .select("extracted_values")
             .eq("user_id", userId)
-            .single(),
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
           supabase
             .from("health_surveys")
             .select("*")
             .eq("user_id", userId)
-            .single(),
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ])
 
         if (medicalRes.data) {
@@ -109,7 +116,12 @@ export function ReviewStep({ userId, onComplete }: ReviewStepProps) {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate diet plan")
+        let details = "Unknown error"
+        try {
+          const errData = await response.json()
+          details = errData.details || errData.error || details
+        } catch(e) {}
+        throw new Error(`Failed to generate diet plan: ${details}`)
       }
 
       onComplete()
@@ -226,6 +238,20 @@ export function ReviewStep({ userId, onComplete }: ReviewStepProps) {
                   </p>
                 </div>
               </div>
+
+              {(healthSurvey.height || healthSurvey.weight) && (
+                <div className="flex items-start gap-3">
+                  <Activity className="h-5 w-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Measurements</p>
+                    <p className="font-medium text-foreground">
+                      {healthSurvey.height ? `${healthSurvey.height} cm` : ''} 
+                      {healthSurvey.height && healthSurvey.weight ? ' / ' : ''}
+                      {healthSurvey.weight ? `${healthSurvey.weight} kg` : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {healthSurvey.allergies && healthSurvey.allergies.length > 0 && (
@@ -263,7 +289,10 @@ export function ReviewStep({ userId, onComplete }: ReviewStepProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="flex justify-end">
+      <CardFooter className="flex justify-between">
+        <Button variant="outline" onClick={onBack} disabled={isGenerating} size="lg">
+          Back
+        </Button>
         <Button onClick={handleGeneratePlan} disabled={isGenerating} size="lg">
           {isGenerating ? (
             <>

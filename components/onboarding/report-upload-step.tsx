@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { 
   FileText, 
   Upload, 
@@ -14,7 +16,8 @@ import {
   AlertCircle, 
   CheckCircle, 
   X,
-  FileImage
+  FileImage,
+  Lock
 } from "lucide-react"
 
 interface ReportUploadStepProps {
@@ -36,6 +39,10 @@ interface ExtractedValues {
 }
 
 export function ReportUploadStep({ userId, onComplete }: ReportUploadStepProps) {
+  const [isVerified, setIsVerified] = useState(false)
+  const [password, setPassword] = useState("")
+  const [isVerifying, setIsVerifying] = useState(false)
+  
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -43,6 +50,37 @@ export function ReportUploadStep({ userId, onComplete }: ReportUploadStepProps) 
   const [error, setError] = useState<string | null>(null)
   const [extractedValues, setExtractedValues] = useState<ExtractedValues | null>(null)
   const supabase = createClient()
+
+  const handleVerify = async () => {
+    setIsVerifying(true)
+    setError(null)
+    try {
+      // Get the user's email from the current session (already logged in)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) {
+        setError("Could not retrieve your account. Please log in again.")
+        setIsVerifying(false)
+        return
+      }
+
+      // Verify password directly in the browser using the existing Supabase client.
+      // This avoids server-side auth context collisions.
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      })
+
+      if (authError) {
+        setError("Incorrect password. Please try again.")
+      } else {
+        setIsVerified(true)
+        setError(null)
+      }
+    } catch (err) {
+      setError("Failed to verify password. Please try again.")
+    }
+    setIsVerifying(false)
+  }
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -107,6 +145,22 @@ export function ReportUploadStep({ userId, onComplete }: ReportUploadStepProps) 
         reportUrl = urlData.publicUrl
       }
 
+      // Convert file to base64 for direct API submission
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            resolve(reader.result.split(",")[1])
+          } else {
+            reject(new Error("Failed to read file format"))
+          }
+        }
+        reader.onerror = (error) => reject(error)
+      })
+
+      const mimeType = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg")
+
       // Call AI analysis API
       const response = await fetch("/api/analyze-report", {
         method: "POST",
@@ -114,15 +168,28 @@ export function ReportUploadStep({ userId, onComplete }: ReportUploadStepProps) 
         body: JSON.stringify({ 
           userId, 
           reportUrl,
-          fileName: file.name 
+          fileName: file.name,
+          fileBase64,
+          mimeType 
         }),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to analyze report")
+      // Safely parse response — avoid crash if server returns HTML error page
+      const rawText = await response.text()
+      let parsed: { extractedValues?: Record<string, unknown>; error?: string } = {}
+      try {
+        parsed = JSON.parse(rawText)
+      } catch {
+        // Server returned a non-JSON response (e.g. Next.js HTML error page)
+        console.error("Non-JSON response from /api/analyze-report:", rawText.slice(0, 200))
+        throw new Error("Report analysis failed. Please try again in a moment.")
       }
 
-      const { extractedValues: values } = await response.json()
+      if (!response.ok) {
+        throw new Error(parsed.error || "Failed to analyze report")
+      }
+
+      const values = parsed.extractedValues as unknown as ExtractedValues
       setExtractedValues(values)
 
       // Save to database
@@ -239,58 +306,90 @@ export function ReportUploadStep({ userId, onComplete }: ReportUploadStepProps) 
               )}
             </div>
 
-            {/* Upload/Analysis progress */}
-            {(isUploading || isAnalyzing) && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {isUploading ? "Uploading..." : "Analyzing report with AI..."}
-                  </span>
-                  {isUploading && <span className="text-muted-foreground">{uploadProgress}%</span>}
+            {!isVerified ? (
+              <div className="space-y-4 py-6 border rounded-lg bg-muted/30 p-6 mt-4">
+                <div className="flex flex-col items-center justify-center space-y-2 text-center mb-4">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Lock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-medium text-foreground">Security Check</h3>
+                    <p className="text-sm text-muted-foreground">Please enter your password to analyze this document.</p>
+                  </div>
                 </div>
-                {isUploading && <Progress value={uploadProgress} className="h-2" />}
-                {isAnalyzing && (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <div className="space-y-2 max-w-sm mx-auto">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      placeholder="••••••••"
+                      onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                    />
+                    <Button onClick={handleVerify} disabled={isVerifying || !password}>
+                      {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Upload/Analysis progress */}
+                {(isUploading || isAnalyzing) && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {isUploading ? "Uploading..." : "Analyzing report with AI..."}
+                      </span>
+                      {isUploading && <span className="text-muted-foreground">{uploadProgress}%</span>}
+                    </div>
+                    {isUploading && <Progress value={uploadProgress} className="h-2" />}
+                    {isAnalyzing && (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Extracted values display */}
-            {extractedValues && Object.keys(extractedValues).length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  Analysis Complete
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(extractedValues).map(([key, data]) => (
-                    data && (
-                      <div key={key} className="p-3 rounded-lg bg-muted/50 border">
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {key.replace(/([A-Z])/g, " $1").trim()}
-                        </p>
-                        <div className="flex items-baseline gap-1 mt-1">
-                          <span className="text-lg font-semibold text-foreground">{data.value}</span>
-                          <span className="text-xs text-muted-foreground">{data.unit}</span>
-                        </div>
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(data.status)}`}>
-                          {data.status}
-                        </span>
-                      </div>
-                    )
-                  ))}
-                </div>
-              </div>
-            )}
+                {/* Extracted values display */}
+                {extractedValues && Object.keys(extractedValues).length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      Analysis Complete
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(extractedValues).map(([key, data]) => (
+                        data && (
+                          <div key={key} className="p-3 rounded-lg bg-muted/50 border">
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {key.replace(/([A-Z])/g, " $1").trim()}
+                            </p>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className="text-lg font-semibold text-foreground">{data.value}</span>
+                              <span className="text-xs text-muted-foreground">{data.unit}</span>
+                            </div>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(data.status)}`}>
+                              {data.status}
+                            </span>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Upload button */}
-            {!extractedValues && !isUploading && !isAnalyzing && (
-              <Button onClick={handleUploadAndAnalyze} className="w-full">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload & Analyze
-              </Button>
+                {/* Upload button */}
+                {!extractedValues && !isUploading && !isAnalyzing && (
+                  <Button onClick={handleUploadAndAnalyze} className="w-full">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload & Analyze
+                  </Button>
+                )}
+              </>
             )}
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Shield, Loader2, AlertCircle } from "lucide-react"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +66,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/auth.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/60 z-[-1]" />
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <Link href="/" className="flex items-center gap-2 mb-4">
@@ -149,5 +154,13 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-muted/30"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

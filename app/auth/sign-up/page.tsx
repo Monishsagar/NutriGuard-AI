@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Shield, Loader2, AlertCircle, Apple, Users } from "lucide-react"
 
-export default function SignUpPage() {
+function SignUpForm() {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -78,7 +78,12 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-[-2]"
+        style={{ backgroundImage: "url('/bg/auth.png')" }}
+      />
+      <div className="fixed inset-0 bg-background/60 z-[-1]" />
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <Link href="/" className="flex items-center gap-2 mb-4">
@@ -221,5 +226,13 @@ export default function SignUpPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-muted/30"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <SignUpForm />
+    </Suspense>
   )
 }

@@ -10,9 +10,9 @@ import {
   LayoutDashboard, 
   Utensils, 
   Camera, 
-  LineChart, 
+  LineChart,
+  TrendingUp,
   User, 
-  Settings, 
   LogOut,
   Menu,
   X,
@@ -23,11 +23,11 @@ import { cn } from "@/lib/utils"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Diet Plan", href: "/dashboard/diet-plan", icon: Utensils },
-  { name: "Log Meal", href: "/dashboard/log-meal", icon: Camera },
-  { name: "Progress", href: "/dashboard/progress", icon: LineChart },
+  { name: "Meals", href: "/dashboard/meals", icon: Camera },
+  { name: "History", href: "/dashboard/history", icon: LineChart },
+  { name: "Progress", href: "/dashboard/progress", icon: TrendingUp },
   { name: "My Guide", href: "/dashboard/guide", icon: Users },
   { name: "Profile", href: "/dashboard/profile", icon: User },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 export function DashboardSidebar() {
